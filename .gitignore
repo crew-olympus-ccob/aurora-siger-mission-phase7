@@ -1,0 +1,23 @@
+# SIFSM | Aurora Siger | FIAP, Fase 7
+# Arquivos gerados em tempo de execução, que não devem entrar no repositório.
+
+# Banco de dados: recriado pelo sistema a partir de script_banco.sql
+aurora_siger.db
+*.db-journal
+
+# Cache do Python
+__pycache__/
+*.py[cod]
+
+# Ambientes virtuais, se alguém usar
+.venv/
+venv/
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# Observação: dados_aurora_siger.csv NÃO está ignorado de propósito.
+# Ele é arquivo obrigatório da entrega (item 2.2 do enunciado), mesmo
+# sendo regerado pelo sistema. O mesmo vale para a pasta
+# graficos_ou_imagens/, que carrega as evidências de execução.
