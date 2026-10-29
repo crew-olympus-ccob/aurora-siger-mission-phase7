@@ -1,0 +1,684 @@
+
+==============================================================================
+            SIFSM: SISTEMA INTEGRADO DE FUTURO SUSTENTÁVEL EM MARTE           
+                 Aurora Siger, Base Harmonia-7 | FIAP, Fase 7                 
+==============================================================================
+
+>>> MODO DEMONSTRAÇÃO: executando todas as funcionalidades do SIFSM.
+
+[OK] Banco criado a partir de script_banco.sql.
+[OK] 384 leituras gravadas no banco.
+[OK] 288 linhas exportadas para dados_aurora_siger.csv.
+
+==============================================================================
+ 1. VISÃO GERAL DA COLÔNIA (BANCO DE DADOS)
+==============================================================================
+cód.   | módulo                     | tipo             | prior. |     kW | status     | origem
+------------------------------------------------------------------------------------------------------
+OXI    | Produção de Oxigênio       | suporte vital    |      5 |   24.7 | ativo      | Fase 5
+MED    | Suporte Médico             | suporte médico   |      5 |   12.3 | ativo      | Fase 5
+COM    | Comunicação                | comunicação      |      5 |    9.6 | manutenção | Fase 5
+ENE    | Armazenamento de Energia   | energia          |      5 |    5.4 | ativo      | Fase 5
+HAB    | Habitação                  | habitação        |      4 |   18.5 | ativo      | Fase 5
+CTR    | Centro de Controle         | controle         |      4 |   15.1 | ativo      | Fase 5
+DAT    | Armazenamento de Dados     | armazenamento    |      4 |   11.2 | ativo      | Fase 6
+COM-R  | Enlace Redundante          | comunicação      |      3 |    8.9 | ativo      | Fase 6
+BKP    | Backup Redundante          | armazenamento    |      3 |    7.8 | ativo      | Fase 6
+EXT    | Antena Externa Remota      | comunicação      |      3 |    6.5 | ativo      | Fase 6
+AGR    | Agricultura                | agricultura      |      2 |   21.0 | manutenção | Fase 5
+LAB    | Laboratório Científico     | laboratório      |      2 |   13.8 | ativo      | Fase 5
+
+Consumo cadastrado total .......   154.8 kW
+Consumo dos módulos ativos .....   124.2 kW
+
+--- Volume de dados no banco ---
+  modulos           12 registros
+  conexoes          17 registros
+  sensores          16 registros
+  leituras         384 registros
+  alertas            3 registros
+  manutencoes        3 registros
+  solicitacoes       4 registros
+
+--- Herança das fases anteriores ---
+  O cadastro de módulos vem da Fase 5 (NCAS), a rede física da
+  Fase 4 (SIGIC) e os alertas abertos da Fase 6 (SCIC).
+
+==============================================================================
+ 2. CADASTRAR, CONSULTAR, ALTERAR E EXCLUIR (CRUD)
+==============================================================================
+Operações demonstradas sobre a tabela 'alertas'.
+
+>>> READ: estado atual da tabela
+
+ id | módulo | tipo                       | crít. | resolv. | mensagem
+--------------------------------------------------------------------------------------------------------
+  1 | COM    | Degradação progressiva     |   sim |     não | Antena com erro crescente de 1,58 ponto 
+  2 | COM-R  | Reconfiguração de rota     |   não |     não | Assumir tráfego crítico enquanto a anten
+  3 | AGR    | Manutenção preventiva      |   não |     não | Sensor de umidade do setor de cultivo co
+
+>>> CREATE: cadastrando um alerta novo
+  Alerta #4 cadastrado.
+
+>>> UPDATE: marcando o alerta como resolvido
+  Alerta #4 atualizado: resolvido = 1.
+
+>>> DELETE: removendo o alerta de teste
+  Alerta #4 excluído.
+
+>>> TRATAMENTO DE ERROS: quatro tentativas inválidas de propósito
+  Módulo inexistente  -> Dados inválidos: FOREIGN KEY constraint failed. Confira se o módulo existe e se a criticidade é 0 ou 1.
+  Criticidade 7       -> Dados inválidos: CHECK constraint failed: critico IN (0, 1). Confira se o módulo existe e se a criticidade é 0 ou 1.
+  Campo protegido     -> Campo 'codigo_modulo' não pode ser alterado. Use: critico, mensagem, resolvido, tipo.
+  id inexistente      -> Nenhum alerta com id 9999.
+
+  Nenhuma dessas tentativas derrubou o programa: todas foram tratadas
+  com try/except e devolveram mensagem explicando o problema.
+
+>>> READ final
+
+ id | módulo | tipo                       | crít. | resolv. | mensagem
+--------------------------------------------------------------------------------------------------------
+  1 | COM    | Degradação progressiva     |   sim |     não | Antena com erro crescente de 1,58 ponto 
+  2 | COM-R  | Reconfiguração de rota     |   não |     não | Assumir tráfego crítico enquanto a anten
+  3 | AGR    | Manutenção preventiva      |   não |     não | Sensor de umidade do setor de cultivo co
+
+==============================================================================
+ 3. REGRA BOOLEANA, CIRCUITO LÓGICO E AUTOMAÇÃO
+==============================================================================
+Regra de decisão do SIFSM para liberar a irrigação do cultivo:
+
+  AGR     = módulo agrícola em operação
+  UMID    = umidade do solo abaixo de 35%
+  SENSOR  = leitura do sensor considerada confiável
+  RESERVA = carga da bateria acima de 15%
+
+--- Simplificação ---
+  Regra original, como a operação descreveu:
+    IRRIGAR = (AGR AND UMID AND SENSOR AND RESERVA)
+              OR (AGR AND UMID AND SENSOR AND NOT RESERVA AND FALSO)
+  
+  Passo 1, elemento absorvente: qualquer termo multiplicado por FALSO é FALSO.
+    IRRIGAR = (AGR AND UMID AND SENSOR AND RESERVA) OR FALSO
+  
+  Passo 2, elemento neutro da soma lógica: X OR FALSO = X.
+    IRRIGAR = AGR AND UMID AND SENSOR AND RESERVA     <- forma mínima
+  
+  Agora a condição de bloqueio, por De Morgan:
+    BLOQUEAR = NOT (AGR AND UMID AND SENSOR AND RESERVA)
+    BLOQUEAR = NOT AGR OR NOT UMID OR NOT SENSOR OR NOT RESERVA
+  
+  Leitura prática: irrigar exige as quatro condições juntas, mas basta
+  uma falhar para bloquear. É por isso que o circuito usa uma porta AND
+  de quatro entradas para a bomba e um NOT na saída para o LED de alerta.
+
+--- Tabela verdade ---
+   AGR  UMID  SENS  RES |  IRRIGAR | BLOQUEAR
+  ----------------------------------------------
+     0     0     0    0 |        0 |        1
+     0     0     0    1 |        0 |        1
+     0     0     1    0 |        0 |        1
+     0     0     1    1 |        0 |        1
+     0     1     0    0 |        0 |        1
+     0     1     0    1 |        0 |        1
+     0     1     1    0 |        0 |        1
+     0     1     1    1 |        0 |        1
+     1     0     0    0 |        0 |        1
+     1     0     0    1 |        0 |        1
+     1     0     1    0 |        0 |        1
+     1     0     1    1 |        0 |        1
+     1     1     0    0 |        0 |        1
+     1     1     0    1 |        0 |        1
+     1     1     1    0 |        0 |        1
+     1     1     1    1 |        1 |        0
+
+  Verificação das 16 combinações: 0 divergência(s).
+  As duas formas da regra são equivalentes, como a álgebra previu.
+
+--- Aplicação ao dado real do banco ---
+  Ciclo 24: umidade 48.3%, bateria 83.8%, AGR em manutenção
+  AGR=0  UMID=0  SENSOR=1  RESERVA=1
+  Decisão do sistema: BLOQUEAR
+  Motivo do bloqueio (De Morgan): módulo em manutenção, umidade acima do limite.
+
+--- Circuito e automação embarcada ---
+  O diagrama do circuito está em graficos_ou_imagens/circuito_logico.png,
+  com a porta AND de quatro entradas, o inversor do LED de bloqueio e
+  o esquema de ligações da placa.
+  O sketch equivalente para Arduino está em arduino_irrigacao.ino: quatro
+  entradas digitais com pull-down de 10k, um LED verde para irrigação
+  liberada, um LED vermelho para bloqueio e um relé na bomba.
+
+==============================================================================
+ 4. ESTRUTURAS DE DADOS APLICADAS AO SISTEMA
+==============================================================================
+--- FILA: atendimento das solicitações da tripulação ---
+  4 solicitações na fila (2 prioritárias, 2 normais).
+  Ordem de atendimento:
+    1. [prioritária] MED_ALVES   MED    urgência 5: Reposição de kit de primeiros socorros
+    2. [prioritária] CMDT_SILVA  COM    urgência 4: Agendar janela de manutenção da antena
+    3. [normal     ] ENG_ROCHA   AGR    urgência 3: Revisar irrigação do setor de cultivo norte
+    4. [normal     ] ENG_ROCHA   LAB    urgência 2: Calibrar bancada de análise de solo
+  Por que fila: o pedido mais antigo da faixa é atendido primeiro, o que
+  evita que uma solicitação fique parada enquanto chegam outras novas.
+
+--- PILHA: histórico de manutenção com desfazer ---
+  3 ações registradas. Topo da pilha (a mais recente):
+    2026-09-01 | COM | Diagnóstico de perda intermitente de sinal | CMDT_SILVA
+  Desempilhando para desfazer as duas últimas:
+    desfeita: Diagnóstico de perda intermitente de sinal (COM, 2026-09-01)
+    desfeita: Verificação de rotina nos compressores (OXI, 2026-08-30)
+  Restam 1 ações na pilha.
+  Por que pilha: desfazer sempre começa pela ação mais recente, que é
+  exatamente a ordem LIFO.
+
+--- TABELA HASH: busca de sensor em tempo constante ---
+  16 sensores indexados por código.
+    0x2A10 -> módulo AGR, mede umidade em % (balde 5)
+    0x3C01 -> módulo COM, mede latencia em ms (balde 0)
+    0x9999 -> não cadastrado
+  Por que hash: a busca por código não percorre a lista, vai direto ao
+  balde calculado pela função de espalhamento, em O(1) no caso médio.
+
+--- ÁRVORE: hierarquia de criticidade dos módulos ---
+  Aurora Siger
+    - Suporte de vida (prioridade 5)
+      - COM (Comunicação), 9.6 kW
+      - ENE (Armazenamento de Energia), 5.4 kW
+      - MED (Suporte Médico), 12.3 kW
+      - OXI (Produção de Oxigênio), 24.7 kW
+    - Operação essencial (prioridade 4)
+      - CTR (Centro de Controle), 15.1 kW
+      - DAT (Armazenamento de Dados), 11.2 kW
+      - HAB (Habitação), 18.5 kW
+    - Apoio e pesquisa (prioridade 1 a 3)
+      - BKP (Backup Redundante), 7.8 kW
+      - COM-R (Enlace Redundante), 8.9 kW
+      - EXT (Antena Externa Remota), 6.5 kW
+      - AGR (Agricultura), 21.0 kW
+      - LAB (Laboratório Científico), 13.8 kW
+
+  Folhas do galho menos crítico: 5 módulos.
+  Por que árvore: o corte de carga desce a hierarquia de baixo para cima,
+  então a estrutura já devolve a ordem correta de desligamento.
+
+--- GRAFO: rede física da colônia e rota de energia ---
+  12 vértices e 17 arestas, vindos da Fase 4.
+
+  Dijkstra a partir de ENE (armazenamento de energia):
+    destino  |  distância | caminho
+    --------------------------------------------------------
+    OXI      |       35 m | ENE -> OXI
+    CTR      |       40 m | ENE -> CTR
+    MED      |       45 m | ENE -> MED
+    HAB      |       55 m | ENE -> HAB
+    DAT      |       75 m | ENE -> CTR -> DAT
+    AGR      |       90 m | ENE -> AGR
+    COM      |      100 m | ENE -> CTR -> COM
+    LAB      |      110 m | ENE -> CTR -> LAB
+    COM-R    |      125 m | ENE -> CTR -> COM -> COM-R
+    BKP      |      130 m | ENE -> CTR -> DAT -> BKP
+    EXT      |      675 m | ENE -> CTR -> COM -> COM-R -> EXT
+
+  Por que grafo: energia e dados viajam por cabos reais, e a pergunta
+  'qual o caminho mais curto até o módulo X' só tem resposta sobre a
+  topologia da rede, não sobre uma lista.
+
+==============================================================================
+ 5. SIMULAÇÃO COMPUTACIONAL E INTEGRAÇÃO MATEMÁTICA
+==============================================================================
+Consumo dos módulos ativos, lido do banco: 124.2 kW
+
+--- Modelo da geração solar ---
+  Sol marciano ............. 24.65 h
+  Janela de luz ............ 6.20 h a 18.45 h (12.25 h)
+  Potência de pico ......... 520.0 kW
+  Fator de poeira .......... 1.00 (céu limpo)
+  P(t) = pico x fator x sen(pi x (t - nascer) / duração), zero à noite
+
+--- Integração matemática: três caminhos, uma só resposta ---
+  Simbólica (SymPy) ........   4055.268 kWh
+  Numérica (SciPy quad) ....   4055.268 kWh  (erro estimado 1.51e-07)
+  Trapézios (NumPy) ........   4055.300 kWh
+  Maior divergência ........      0.032 kWh (0.0008%)
+  Os três métodos convergem, o que valida tanto o modelo quanto a
+  taxa de amostragem do sensor de geração.
+
+--- Balanço do sol ---
+  Potência média gerada ....     164.52 kW
+  Energia gerada ...........    4055.30 kWh
+  Energia consumida ........    3061.53 kWh (124.2 kW constantes)
+  Saldo ....................    +993.77 kWh
+  Carga final da bateria ...     100.00%
+  Carga mínima no sol ......      38.60%
+
+  [OK] O sol fecha com saldo positivo e a reserva se recompõe.
+
+--- Limitações assumidas ---
+  O modelo trata o consumo como constante ao longo do sol e ignora
+  perdas de conversão, temperatura do painel e inclinação do terreno.
+  Serve para decidir corte de carga, não para dimensionar o sistema.
+
+  [gráfico salvo] graficos_ou_imagens/01_balanco_energetico.png
+
+--- Comparação de cenários de poeira ---
+  cenário                |  fator |  gerado (kWh) |  saldo (kWh) | carga mín.
+  ----------------------------------------------------------------------------
+  Céu limpo              |   1.00 |        4055.3 |       +993.8 |      38.6%
+  Poeira moderada        |   0.70 |        2838.7 |       -222.8 |      37.3%
+  Tempestade severa      |   0.45 |        1824.9 |      -1236.6 |      18.2%
+
+--- Decisão de corte de carga para a tempestade severa ---
+  Corte necessário ......... 0 kW (0% do consumo total)
+  Consumo resultante ....... 124.2 kW
+  Carga mínima com o corte . 18.2%
+  Na prática: desligar os módulos de menor prioridade cadastral
+  (LAB e AGR, prioridade 2) libera a maior parte desse corte.
+
+--- Convolução: filtrando o sensor de umidade ---
+  Série de 24 ciclos do sensor 0x2A10 (módulo AGR).
+  Desvio padrão bruto ......   9.38
+  Desvio padrão filtrado ...   4.35
+  Redução de ruído .........  53.6%
+  O alerta da Fase 5 dizia que esse sensor tinha leitura instável.
+  A convolução com núcleo de média móvel resolve por software, sem
+  precisar trocar o equipamento.
+
+==============================================================================
+ 6. MODELAGEM LINEAR E TOMADA DE DECISÃO
+==============================================================================
+Base de análise: 288 linhas (12 módulos x 24 ciclos).
+
+--- Análise exploratória ---
+       consumo_kw  ocupacao_pct  temperatura_externa_c  fator_luz
+count      288.00        288.00                 288.00     288.00
+mean        23.87         66.93                 -60.80       0.87
+std          6.16         15.38                  11.77       0.14
+min         11.63         31.90                 -74.80       0.48
+25%         19.00         55.80                 -68.92       0.89
+50%         23.14         67.50                 -66.20       0.92
+75%         27.60         79.10                 -56.25       0.97
+max         42.13         99.00                 -30.10       1.00
+
+--- Correlação com o consumo ---
+  temperatura_externa_c    -0.201  (fraca)
+  ocupacao_pct             +0.194  (fraca)
+  fator_luz                -0.111  (fraca)
+
+--- Modelo: consumo_kw ~ consumo_base_kw + ocupacao_pct + temperatura_externa_c + fator_luz ---
+Divisão: 216 linhas de treino e 72 de teste.
+
+  MAE  =  0.677 kW   (erro típico)
+  RMSE =  0.841 kW   (penaliza os piores casos)
+  R2   = 0.9768      (variação explicada)
+
+--- Interpretação dos coeficientes ---
+  intercepto ...............  +3.120 kW
+  variável                    coef.  esperado   leitura física
+  --------------------------------------------------------------------------------------------
+  consumo_base_kw            +1.006    +1.000   cada kW de consumo cadastrado soma 1.006 kW ao total
+  ocupacao_pct               +0.080    +0.080   cada 1% de ocupação a mais soma 0.080 kW
+  temperatura_externa_c      -0.123    -0.120   cada grau a MAIS lá fora economiza 0.123 kW de aquecimento
+  fator_luz                  -5.833    -6.000   céu totalmente limpo (fator 1) economiza 5.83 kW frente ao escuro
+
+  A coluna 'esperado' traz os pesos reais que o gerador usou. O modelo
+  recuperou os quatro a partir dos dados, sem conhecer a fórmula, o que
+  confirma que a regressão está capturando a física e não o acaso.
+
+--- Fator que prejudicaria a interpretação ---
+  A ocupação e a prioridade do módulo têm correlação de +0.387,
+  porque módulos críticos são mais ocupados. Colocar as duas juntas no
+  modelo gera colinearidade: os coeficientes se dividem entre elas e
+  param de ter leitura física (numa versão anterior, a prioridade
+  aparecia com sinal negativo, sugerindo o absurdo de que módulo mais
+  crítico gasta menos). A prioridade ficou de fora porque já está
+  embutida no consumo cadastrado, que é a variável com significado direto.
+
+--- Decisão apoiada pelo modelo ---
+  Cenário de tempestade severa no módulo OXI (24,7 kW de base):
+    ocupação 80%, externa -78 C, fator de luz 0,45
+    consumo estimado: 41.35 kW por módulo
+  Esse número alimenta a decisão de corte de carga da simulação: é o
+  consumo que a colônia precisa cobrir no pior cenário previsto.
+
+  [gráfico salvo] graficos_ou_imagens/02_modelo_consumo.png
+
+==============================================================================
+ 7. INTEGRAÇÃO DE IA E SISTEMAS MULTIAGENTES
+==============================================================================
+Arquitetura: guardrail de entrada, agente triador, handoff para o
+especialista, ferramentas determinísticas sobre o banco, RAG nos
+registros e guardrail de saída exigindo fonte.
+
+Nenhuma API externa é chamada. As respostas saem de consultas SQL,
+o que torna cada número verificável no banco.
+
+------------------------------------------------------------------------------
+  Operador: Qual o consumo de energia da colônia e o que podemos desligar?
+
+  Rastro da decisão (tracing):
+    guardrail_entrada  -> liberado
+      O pedido cita uma ação ('desligar'), mas na forma de consulta: liberado como recomendação, não como execução.
+    agente_triador     -> energia
+      Domínio 'energia' com 2 termo(s) reconhecido(s).
+    handoff            -> Agente de Energia
+      Contexto da sessão repassado ao Agente de Energia.
+    ferramentas        -> consumo_por_modulo
+      1 função determinística executada sobre o banco.
+    guardrail_saida    -> liberado
+      Resposta fundamentada em 1 registro(s) do banco.
+
+  Agente responsável: Agente de Energia
+
+  Resposta:
+    Consumo somado dos módulos ativos: 124.2 kW. Maiores consumidores: OXI
+    (Produção de Oxigênio) com 24.7 kW, AGR (Agricultura) com 21.0 kW, HAB
+    (Habitação) com 18.5 kW. Corte possível sem afetar suporte de vida: 13.8
+    kW, desligando LAB (prioridade cadastral 2).
+
+  Fontes no banco de dados:
+    - modulos: 12 registros da tabela modulos
+
+------------------------------------------------------------------------------
+  Operador: A umidade do setor de cultivo está baixa?
+
+  Rastro da decisão (tracing):
+    guardrail_entrada  -> liberado
+      Pedido dentro do escopo e sem ação irreversível.
+    agente_triador     -> ambiental
+      Domínio 'ambiental' com 2 termo(s) reconhecido(s).
+    handoff            -> Agente Ambiental
+      Contexto da sessão repassado ao Agente Ambiental.
+    ferramentas        -> ultima_leitura
+      1 função determinística executada sobre o banco.
+    rag                -> 2 trecho(s)
+      Registros recuperados do banco para fundamentar a resposta.
+    guardrail_saida    -> liberado
+      Resposta fundamentada em 4 registro(s) do banco.
+
+  Agente responsável: Agente Ambiental
+
+  Resposta:
+    Umidade do módulo AGR no ciclo 24: 48.3%. Acima do limite de 35%:
+    irrigação não recomendada neste ciclo. Temperatura interna de HAB:
+    22.0C.
+
+  Fontes no banco de dados:
+    - leituras: sensor de umidade do módulo AGR, ciclo 24
+    - leituras: sensor de temperatura do módulo HAB, ciclo 24
+    - alertas: alerta #3 (AGR): Sensor de umidade do setor de cultivo com leitura instável.
+    - solicitações: solicitação #2 (AGR): Revisar irrigação do setor de cultivo norte
+
+------------------------------------------------------------------------------
+  Operador: Quais manutenções estão pendentes na antena?
+
+  Rastro da decisão (tracing):
+    guardrail_entrada  -> liberado
+      Pedido dentro do escopo e sem ação irreversível.
+    agente_triador     -> manutencao
+      Domínio 'manutencao' com 1 termo(s) reconhecido(s).
+    handoff            -> Agente de Manutenção
+      Contexto da sessão repassado ao Agente de Manutenção.
+    ferramentas        -> alertas_abertos, historico_manutencao
+      2 função determinística executada sobre o banco.
+    rag                -> 3 trecho(s)
+      Registros recuperados do banco para fundamentar a resposta.
+    guardrail_saida    -> liberado
+      Resposta fundamentada em 5 registro(s) do banco.
+
+  Agente responsável: Agente de Manutenção
+
+  Resposta:
+    Alertas em aberto: 3. [CRÍTICO] COM, Degradação progressiva, desde
+    2026-09-26: Antena com erro crescente de 1,58 ponto percentual por ciclo
+    desde a Fase 5. [atenção] COM-R, Reconfiguração de rota, desde
+    2026-09-26: Assumir tráfego crítico enquanto a antena principal estiver
+    em manutenção. [atenção] AGR, Manutenção preventiva, desde 2026-09-28:
+    Sensor de umidade do setor de cultivo com leitura instável. Última
+    manutenção registrada: Diagnóstico de perda intermitente de sinal em
+    COM, por CMDT_SILVA, em 2026-09-01.
+
+  Fontes no banco de dados:
+    - alertas: 3 alertas não resolvidos
+    - manutencoes: 3 registros de histórico
+    - alertas: alerta #1 (COM): Antena com erro crescente de 1,58 ponto percentual por ciclo
+    - alertas: alerta #2 (COM-R): Assumir tráfego crítico enquanto a antena principal estiver 
+    - solicitações: solicitação #3 (COM): Agendar janela de manutenção da antena
+
+------------------------------------------------------------------------------
+  Operador: Desligue o módulo de oxigênio agora
+
+  Rastro da decisão (tracing):
+    guardrail_entrada  -> BLOQUEADO
+      O pedido é uma ordem de ação irreversível ('desligue'). O SIFSM recomenda, mas não executa: encaminhe ao comando da colônia para validação humana.
+
+  Agente responsável: guardrail
+
+  [BLOQUEADO PELO GUARDRAIL]
+  O pedido é uma ordem de ação irreversível ('desligue'). O SIFSM recomenda, mas não executa: encaminhe ao comando da colônia para validação humana.
+
+------------------------------------------------------------------------------
+  Operador: drop table alertas
+
+  Rastro da decisão (tracing):
+    guardrail_entrada  -> BLOQUEADO
+      Operação destrutiva sobre os dados ('drop table'). O agente não altera nem apaga o banco em nenhuma hipótese: isso só acontece pelo menu de CRUD, com operador identificado.
+
+  Agente responsável: guardrail
+
+  [BLOQUEADO PELO GUARDRAIL]
+  Operação destrutiva sobre os dados ('drop table'). O agente não altera nem apaga o banco em nenhuma hipótese: isso só acontece pelo menu de CRUD, com operador identificado.
+
+------------------------------------------------------------------------------
+  Operador: Me conta uma piada sobre Marte
+
+  Rastro da decisão (tracing):
+    guardrail_entrada  -> BLOQUEADO
+      Assunto fora do escopo operacional ('piada'). O sistema responde sobre energia, ambiente, manutenção e dados da Aurora Siger.
+
+  Agente responsável: guardrail
+
+  [BLOQUEADO PELO GUARDRAIL]
+  Assunto fora do escopo operacional ('piada'). O sistema responde sobre energia, ambiente, manutenção e dados da Aurora Siger.
+
+------------------------------------------------------------------------------
+  Sessão de CMDT_SILVA, aberta em 2026-10-27 19:36, com 3 atendimento(s). Distribuição: Agente de Energia: 1, Agente Ambiental: 1, Agente de Manutenção: 1.
+
+  Responsabilidade humana: o sistema sugere e justifica, mas as duas
+  últimas perguntas mostram o guardrail barrando ação irreversível e
+  assunto fora de escopo. Quem decide desligar um módulo é a equipe.
+
+==============================================================================
+ 8. ARQUITETURA COMPUTACIONAL E DESEMPENHO
+==============================================================================
+--- Onde cada parte do SIFSM roda melhor ---
+  etapa do sistema                   | unidade  | motivo
+  --------------------------------------------------------------------------------------------
+  Consultas SQL e CRUD               | CPU      | trabalho sequencial, dominado por acesso a disco
+  Integração numérica da simulação   | CPU/GPU  | vetorizável: cada ponto é independente
+  Regressão linear múltipla          | CPU      | matriz pequena, resolvida direto por álgebra
+  Dijkstra sobre o grafo             | CPU      | percurso com dependência entre passos
+  Filtro de convolução do sensor     | GPU/NPU  | mesma operação repetida sobre a série
+  Inferência de um modelo de IA real | NPU/TPU  | multiplicação de matrizes em lote
+
+--- Hierarquia de memória e movimentação de dados ---
+  O banco tem 384 leituras, algumas centenas de kilobytes.
+  A base inteira cabe na memória RAM e boa parte dela cabe no cache L2,
+  então o gargalo do SIFSM hoje não é cálculo, é o acesso ao disco.
+  É por isso que o sistema cria índices nas colunas codigo_sensor e
+  ciclo: eles reduzem a quantidade de páginas lidas do disco por consulta.
+
+  Quando a colônia crescer para milhões de leituras, o custo passa a ser
+  o transporte de dados entre memória e processador, não a operação em si.
+  Esse é o gargalo de von Neumann, e a resposta não é um processador mais
+  rápido: é levar menos dado, com agregação no próprio banco e colunas
+  numéricas compactas.
+
+--- Largura de banda: o número que decide o gargalo ---
+  Uma consulta que varre as 384 leituras move cerca de 30 KB. Um disco
+  SSD entrega algo como 500 MB/s e a memória RAM passa de 20 GB/s, ou
+  seja, quarenta vezes mais. Enquanto o dado cabe na RAM, a largura de
+  banda sobra e o processador fica esperando o disco.
+  Com milhões de registros a conta inverte: o processador consegue
+  calcular mais rápido do que a memória consegue entregar o dado, e
+  aí a largura de banda vira o teto do sistema, não a frequência da CPU.
+
+--- Arquiteturas modernas: ASICs e chiplets ---
+  Um ASIC é um circuito desenhado para uma função só. A regra de
+  irrigação do SIFSM é o exemplo perfeito: uma porta AND de quatro
+  entradas resolvida em hardware dedicado gastaria uma fração do que
+  gasta um microcontrolador de uso geral rodando o mesmo if.
+  O custo é a rigidez, porque mudar o limite de umidade de 35% para
+  40% exigiria refazer o chip, enquanto no Arduino é uma linha.
+
+  Chiplets são blocos menores montados num mesmo encapsulamento, em vez
+  de um único chip grande. Para a colônia o atrativo é logístico: um
+  bloco defeituoso pode ser trocado sem substituir o processador
+  inteiro, o que importa quando a peça de reposição vem da Terra.
+
+--- Processamento paralelo ---
+  A simulação energética avalia a potência em 400 instantes do sol, e
+  cada ponto é independente dos outros. Isso é paralelismo de dados:
+  o NumPy já resolve de forma vetorizada e uma GPU dividiria entre
+  milhares de núcleos. O Dijkstra é o oposto, porque cada passo depende
+  do anterior, então nem o melhor hardware paralelo ajudaria.
+  Saber distinguir os dois casos é o que evita comprar aceleração que
+  não vai ser usada.
+
+--- Computação heterogênea na prática da colônia ---
+  Um sistema embarcado simples no módulo agrícola já resolve a regra de
+  irrigação, porque a decisão é uma porta AND de quatro entradas.
+  Mandar esse dado para um servidor central gastaria energia de rádio
+  para decidir o que um microcontrolador de poucos miliwatts decide no
+  local. Processar na borda é decisão de arquitetura e de energia ao
+  mesmo tempo.
+
+--- Desempenho, energia e sustentabilidade ---
+  Toda operação computacional sai do mesmo orçamento solar que abastece
+  o suporte de vida. Um modelo de IA grande rodando continuamente na
+  colônia competiria por energia com a produção de oxigênio.
+  Foi por isso que a camada de IA do SIFSM usa funções determinísticas:
+  entrega resposta auditável com consumo praticamente nulo.
+
+==============================================================================
+ 9. SUSTENTABILIDADE, CIDADANIA DIGITAL E IMPACTO SOCIOAMBIENTAL
+==============================================================================
+--- Integração entre energia, dados, automação e simulação ---
+  A colônia gera 4055 kWh por sol em céu
+  limpo e consome 3062 kWh. A margem é de
+  apenas +994 kWh, pouco mais de 6% do consumo.
+  É essa margem estreita que obriga a integrar as camadas: o sensor mede,
+  o banco guarda, a regra decide e a simulação antecipa. Sem integração,
+  a colônia só descobriria o problema quando a bateria já estivesse baixa.
+
+--- Simulação como prevenção de desperdício ---
+  Hoje a colônia consome 124.2 kW, porque AGR e COM estão
+  em manutenção. Nessa condição ela atravessa uma tempestade severa com
+  18.2% de carga mínima, sem precisar cortar nada.
+
+  Quando os dois voltarem ao pleno, o consumo sobe para 154.8 kW
+  e a mesma tempestade exige cortar 29 kW de carga.
+  Os módulos de prioridade 2 somam 34.8 kW e cobrem o corte
+  sem tocar no suporte de vida.
+  Saber disso antes evita um desligamento de emergência. Simular é mais
+  barato que errar: nenhuma energia foi gasta para descobrir isso.
+
+--- Redes inteligentes, armazenamento e resiliência ---
+  A autonomia da colônia depende de três camadas trabalhando juntas: a
+  física, que são painéis, bateria e cabos; a de controle, que é a regra
+  booleana decidindo no módulo agrícola; e a analítica, que é o banco
+  com a simulação e o modelo.
+  Resiliência aqui tem nome e número: COM e COM-R formam um par
+  redundante, assim como DAT e BKP. Mas a antena externa EXT está a 675
+  metros por um caminho único, então uma falha em COM-R a desconecta.
+  O grafo mostra essa fragilidade antes que ela vire incidente, e é
+  isso que uma rede inteligente faz: conhece a própria topologia.
+
+--- Inovação responsável: benefício contra risco ---
+  Nem toda tecnologia disponível deveria entrar na colônia. O SIFSM
+  recusou duas de propósito, e o motivo é o mesmo nos dois casos.
+  Um modelo de linguagem rodando local daria respostas mais naturais,
+  mas consumiria energia do mesmo orçamento do suporte de vida e
+  responderia sem fonte verificável. Ficaram as funções determinísticas.
+  Automatizar o desligamento de módulos na tempestade seria mais rápido
+  que esperar aprovação humana, e é tecnicamente trivial. Não foi feito
+  porque um erro de sensor desligaria oxigênio sem ninguém no circuito.
+  Inovação responsável é isso: avaliar o que a tecnologia custa e o que
+  ela arrisca, não só o que ela entrega.
+
+--- Cidadania digital, privacidade e transparência ---
+  O banco guarda quem pediu o quê, na tabela solicitacoes, com nome do
+  solicitante. Isso é dado pessoal da tripulação e exige cuidado.
+  O SIFSM registra apenas o identificador funcional (CMDT_SILVA,
+  ENG_ROCHA, MED_ALVES), nunca dado de saúde ou conteúdo privado, e as
+  solicitações de suporte médico guardam só o módulo e a urgência, sem
+  descrever a condição de quem pediu.
+  Transparência: toda resposta da camada de IA cita o registro do banco
+  que a fundamenta, e o rastro da decisão fica visível na tela.
+
+--- Economia dos dados e seus riscos ---
+  Os dados de consumo por módulo revelam rotina de vida: quando a
+  tripulação dorme, quando o laboratório trabalha, quantas pessoas estão
+  em cada setor. Numa colônia pequena, isso identifica indivíduos mesmo
+  sem nome na tabela. Por isso a ocupação é guardada como percentual
+  agregado por módulo, e não como registro de presença individual.
+
+--- Impacto ambiental do processamento ---
+  Data centers consomem água e energia. Em Marte os dois são recursos
+  que não se repõem. A decisão de processar na borda, usar um banco
+  local em arquivo e evitar modelo pesado não é economia de código:
+  é economia de litro de água e de quilowatt-hora.
+
+--- Diversidade, inclusão e responsabilidade ---
+  A fila de atendimento ordena por urgência declarada e ordem de chegada,
+  nunca por cargo ou senioridade de quem pediu. A árvore de prioridades
+  classifica módulos por função vital, não por importância das pessoas
+  que os ocupam. São escolhas de projeto que impedem o sistema de
+  reproduzir hierarquia social na distribuição de recursos.
+  E toda recomendação crítica passa por validação humana, porque a
+  responsabilidade por uma decisão que afeta vidas não é delegável.
+
+==============================================================================
+ 10. ANÁLISE FINAL DOS RESULTADOS E LIMITAÇÕES
+==============================================================================
+--- Situação da colônia ---
+  Módulos cadastrados .............. 12
+  Leituras no banco ................ 384
+  Alertas em aberto ................ 3 (1 crítico)
+  Consumo dos módulos ativos ....... 124.2 kW
+  Energia gerada por sol ........... 4055 kWh
+  Saldo em céu limpo ............... +994 kWh
+  Modelo de consumo ................ R2 0.9768, MAE 0.68 kW
+  Corte exigido na tempestade, hoje ..... 0 kW (carga mínima 18.2%)
+  Corte exigido no pleno (154.8 kW) .... 29 kW
+
+--- Recomendações do SIFSM ---
+  1. Planejar corte de 29 kW para quando AGR e COM
+     voltarem ao pleno. Candidatos de prioridade 2: AGR (21.0 kW), LAB (13.8 kW),
+     somando 34.8 kW disponíveis.
+  2. Concluir a manutenção da antena COM, pendente desde a Fase 5, e
+     manter o tráfego crítico no enlace redundante até lá.
+  3. Aplicar o filtro de convolução ao sensor de umidade do AGR em vez
+     de substituir o equipamento, o que economiza peça e transporte.
+  4. Toda decisão acima é sugestão: a validação é da equipe da colônia.
+
+--- Limitações reconhecidas ---
+  1. Os dados são simulados por um processo conhecido, o que favorece o
+     modelo linear. Com telemetria real o R2 seria menor.
+  2. A simulação trata o consumo como constante ao longo do sol e ignora
+     perdas de conversão e temperatura do painel.
+  3. A camada de IA usa funções determinísticas, não um modelo de
+     linguagem: ela demonstra a arquitetura, não a capacidade de
+     interpretar linguagem livre.
+  4. O banco é SQLite em arquivo único, adequado ao protótipo mas sem
+     concorrência de escrita, que um Oracle ou Postgres resolveria.
+  5. O circuito lógico é representado e simulado, sem hardware real.
+
+  [gráfico salvo] graficos_ou_imagens/03_painel_final.png
+
+==============================================================================
+ DEMONSTRAÇÃO CONCLUÍDA
+==============================================================================
+Todas as funcionalidades do SIFSM foram executadas com sucesso.
+Gráficos disponíveis na pasta graficos_ou_imagens/.
+
