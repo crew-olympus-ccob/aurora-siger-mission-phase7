@@ -14,7 +14,7 @@
                   e prompts. Dele vêm o cadastro de módulos e os operadores.
    Fase 6, SCIC:  análise de latência, que descobriu a antena do módulo COM se
                   degradando e deixou três recomendações em aberto.
-   Fase 7, SIFSM: este sistema leva tudo para um banco de dados relacional,
+   Fase 7, SIFSM: este sistema. Leva tudo para um banco de dados relacional,
                   acrescenta a camada de energia e sustentabilidade e assume
                   as três pendências da fase anterior como alertas ativos.
 
@@ -44,26 +44,38 @@ import sqlite3
 from collections import deque
 from datetime import datetime, timedelta
 
-import numpy as np
-import pandas as pd
-import matplotlib
+# Bibliotecas de terceiros e módulos do próprio projeto, no mesmo try.
+# As duas falhas chegam aqui como ImportError, mas pedem providências
+# diferentes: uma se resolve instalando, a outra reunindo os arquivos na
+# mesma pasta. Por isso o except separa os dois casos antes de orientar.
+MODULOS_DO_PROJETO = ("simulacao_computacional", "agentes_ia")
+DEPENDENCIAS = "numpy pandas matplotlib seaborn scikit-learn scipy sympy"
 
-matplotlib.use("Agg")  # backend sem janela: salva os gráficos em arquivo
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-# Módulos do próprio projeto
 try:
+    import numpy as np
+    import pandas as pd
+    import matplotlib
+
+    matplotlib.use("Agg")  # backend sem janela: salva os gráficos em arquivo
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    from sklearn.model_selection import train_test_split
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
     import simulacao_computacional as sim
     import agentes_ia as ia
 except ImportError as erro:  # pragma: no cover
-    print(f"[ERRO] Arquivo do projeto não encontrado: {erro}")
-    print("       codigo_fonte.py, simulacao_computacional.py e agentes_ia.py")
-    print("       precisam estar na mesma pasta.")
+    faltante = getattr(erro, "name", None) or str(erro)
+    if faltante in MODULOS_DO_PROJETO:
+        print(f"[ERRO] Arquivo do projeto não encontrado: {faltante}.py")
+        print("       codigo_fonte.py, simulacao_computacional.py e agentes_ia.py")
+        print("       precisam estar na mesma pasta.")
+    else:
+        print(f"[ERRO] Biblioteca não instalada: {faltante}")
+        print("       Instale as dependências do projeto com:")
+        print(f"       pip install {DEPENDENCIAS}")
     sys.exit(1)
 
 # Acentuação correta mesmo em terminais Windows com codificação legada
@@ -847,7 +859,7 @@ def opcao_regra_logica(con, interativo=True):
     print("  o esquema de ligações da placa.")
     print("  O sketch equivalente para Arduino está em arduino_irrigacao.ino: quatro")
     print("  entradas digitais com pull-down de 10k, um LED verde para irrigação")
-    print("  liberada, um LED vermelho para bloqueio e um relé na bomba.")
+    print("  liberada, um LED vermelho para bloqueio e um módulo relé na bomba.")
 
 
 def opcao_estruturas(con):
