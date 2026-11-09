@@ -858,7 +858,7 @@ def opcao_regra_logica(con, interativo=True):
     print("  com a porta AND de quatro entradas, o inversor do LED de bloqueio e")
     print("  o esquema de ligações da placa.")
     print("  O sketch equivalente para Arduino está em arduino_irrigacao.ino: quatro")
-    print("  entradas digitais com pull-down de 10k, um LED verde para irrigação")
+    print("  entradas digitais com pull-down de 10 k ohm, um LED verde para irrigação")
     print("  liberada, um LED vermelho para bloqueio e um módulo relé na bomba.")
 
 
@@ -1360,7 +1360,8 @@ def opcao_analise_final(con, resultado_modelo=None):
     print("     interpretar linguagem livre.")
     print("  4. O banco é SQLite em arquivo único, adequado ao protótipo mas sem")
     print("     concorrência de escrita, que um Oracle ou Postgres resolveria.")
-    print("  5. O circuito lógico é representado e simulado, sem hardware real.")
+    print("  5. O circuito lógico é representado em diagrama e implementado em")
+    print("     código embarcado, sem hardware montado nem simulação eletrônica.")
 
     _painel_final(con)
 

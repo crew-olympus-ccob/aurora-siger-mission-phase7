@@ -97,7 +97,7 @@ A rede física entre os módulos, com as distâncias em metros, vem do grafo da 
 
 O banco `aurora_siger.db` não acompanha a entrega: ele é criado na primeira execução, a partir do `script_banco.sql`.
 
-O arquivo `graficos_ou_imagens/evidencia_execucao.txt` traz a saída completa de `python codigo_fonte.py --demo`, com 684 linhas e sem nenhum erro, como evidência de que a entrega roda de ponta a ponta.
+O arquivo `graficos_ou_imagens/evidencia_execucao.txt` traz a saída completa de `python codigo_fonte.py --demo`, com 685 linhas e sem nenhum erro, como evidência de que a entrega roda de ponta a ponta.
 
 Sobre o circuito: o enunciado aceita representação, explicação ou simulação. Optamos por representar, em `circuito_logico.png`, as portas lógicas, a tabela verdade e o esquema de ligações da placa, e por entregar o código embarcado em `arduino_irrigacao.ino`. Os pinos desenhados na figura são os mesmos declarados no sketch, de modo que diagrama e código não divergem.
 

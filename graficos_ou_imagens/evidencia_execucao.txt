@@ -146,8 +146,8 @@ Regra de decisão do SIFSM para liberar a irrigação do cultivo:
   com a porta AND de quatro entradas, o inversor do LED de bloqueio e
   o esquema de ligações da placa.
   O sketch equivalente para Arduino está em arduino_irrigacao.ino: quatro
-  entradas digitais com pull-down de 10k, um LED verde para irrigação
-  liberada, um LED vermelho para bloqueio e um relé na bomba.
+  entradas digitais com pull-down de 10 k ohm, um LED verde para irrigação
+  liberada, um LED vermelho para bloqueio e um módulo relé na bomba.
 
 ==============================================================================
  4. ESTRUTURAS DE DADOS APLICADAS AO SISTEMA
@@ -174,8 +174,8 @@ Regra de decisão do SIFSM para liberar a irrigação do cultivo:
 
 --- TABELA HASH: busca de sensor em tempo constante ---
   16 sensores indexados por código.
-    0x2A10 -> módulo AGR, mede umidade em % (balde 5)
-    0x3C01 -> módulo COM, mede latencia em ms (balde 0)
+    0x2A10 -> módulo AGR, mede umidade em % (balde 11)
+    0x3C01 -> módulo COM, mede latencia em ms (balde 10)
     0x9999 -> não cadastrado
   Por que hash: a busca por código não percorre a lista, vai direto ao
   balde calculado pela função de espalhamento, em O(1) no caso médio.
@@ -482,7 +482,7 @@ o que torna cada número verificável no banco.
   Assunto fora do escopo operacional ('piada'). O sistema responde sobre energia, ambiente, manutenção e dados da Aurora Siger.
 
 ------------------------------------------------------------------------------
-  Sessão de CMDT_SILVA, aberta em 2026-10-27 19:36, com 3 atendimento(s). Distribuição: Agente de Energia: 1, Agente Ambiental: 1, Agente de Manutenção: 1.
+  Sessão de CMDT_SILVA, aberta em 2026-11-09 14:53, com 3 atendimento(s). Distribuição: Agente de Energia: 1, Agente Ambiental: 1, Agente de Manutenção: 1.
 
   Responsabilidade humana: o sistema sugere e justifica, mas as duas
   últimas perguntas mostram o guardrail barrando ação irreversível e
@@ -672,7 +672,8 @@ o que torna cada número verificável no banco.
      interpretar linguagem livre.
   4. O banco é SQLite em arquivo único, adequado ao protótipo mas sem
      concorrência de escrita, que um Oracle ou Postgres resolveria.
-  5. O circuito lógico é representado e simulado, sem hardware real.
+  5. O circuito lógico é representado em diagrama e implementado em
+     código embarcado, sem hardware montado nem simulação eletrônica.
 
   [gráfico salvo] graficos_ou_imagens/03_painel_final.png
 
